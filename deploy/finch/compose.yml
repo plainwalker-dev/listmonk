@@ -35,6 +35,12 @@ services:
       TZ: America/New_York
     volumes:
       - uploads:/listmonk/uploads
+    healthcheck:
+      test: [CMD, wget, -q, -O, /dev/null, 'http://127.0.0.1:9000/health']
+      interval: 10s
+      timeout: 5s
+      start_period: 30s
+      retries: 12
   caddy:
     image: caddy:2-alpine
     restart: unless-stopped

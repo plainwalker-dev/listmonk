@@ -46,6 +46,13 @@ Do not create or broaden IAM grants until the exact project is known.
    database before importing contacts. Add persistent-disk snapshot schedules
    as an additional recovery layer. These are deployment tasks, not yet configured.
 
+`upload-backup.py` uploads a completed database/uploads pair with generation-zero
+preconditions and verifies each returned checksum. It uses the VM metadata
+identity, restricted to Storage Object Creator on the dedicated private backup
+bucket. It cannot read or delete existing backup objects. Configure BACKUP_BUCKET
+in a systemd drop-in and run the uploader as ExecStartPost of the backup service.
+Never grant project-wide Storage Admin or save a service-account key on the VM.
+
 The Compose application uses the released listmonk image because the integration
 does not modify its Go code. The MCP container is built from this fork's `mcp/`.
 The VM persists container volumes across reboots; deleting a VM or disk requires
