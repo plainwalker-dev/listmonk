@@ -33,7 +33,7 @@ export function createServer({ client, reviews, owner = 'local-operator', scopes
       }
     });
   }
-  tool('list_newsletter_audiences', 'List the configured allowed audiences and their subscriber counts. Does not expose individual contacts.', {}, annotations(true), () => client.listLists());
+  tool('list_newsletter_audiences', 'List allowed audiences with membership totals and subscription-status counts. Totals include unsubscribed memberships and are not eligible-recipient counts. Does not expose individual contacts.', {}, annotations(true), () => client.listLists());
   tool('list_newsletter_templates', 'List newsletter templates so you can select a campaign template and follow the Finch brand.', {}, annotations(true), () => client.request('/api/templates'));
   tool('get_newsletter', 'Read one newsletter campaign. Its audiences must be allowed.', { campaign_id: id }, annotations(true), ({ campaign_id }) => client.getCampaign(campaign_id));
   tool('create_newsletter_draft', 'Save a newsletter draft in listmonk. Never sends or schedules email. Use a selected campaign template with the correct unsubscribe footer.', draftSchema, annotations(false), input => client.createDraft(input));

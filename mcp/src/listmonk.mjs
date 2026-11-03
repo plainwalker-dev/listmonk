@@ -33,7 +33,19 @@ export class ListmonkClient {
   }
   async listLists() {
     // Fetch individually so the bridge never returns unrelated list metadata.
-    return Promise.all([...this.allowed].map(id => this.request(`/api/lists/${id}`)));
+    return Promise.all([...this.allowed].map(id => this.getList(id)));
+  }
+  async getList(id) {
+    const list = await this.request(`/api/lists/${id}`);
+    // v6.2 GetList adds status totals to an already aggregated SQL total.
+    // The status breakdown avoids that double count without reading contacts.
+    if (list.subscriber_statuses && typeof list.subscriber_statuses === 'object' && !Array.isArray(list.subscriber_statuses)) {
+      const counts = Object.values(list.subscriber_statuses);
+      if (counts.every(n => Number.isSafeInteger(n) && n >= 0)) {
+        return { ...list, subscriber_count: counts.reduce((sum, n) => sum + n, 0) };
+      }
+    }
+    return list;
   }
   async createDraft(input) {
     this.checkLists(input.lists);
@@ -66,7 +78,7 @@ export class ListmonkClient {
       ? templates.find(t => t.id === campaign.template_id)
       : templates.find(t => t.is_default && t.type === 'campaign');
     if (!template) throw new Error('The campaign template could not be resolved.');
-    const lists = await Promise.all(campaign.lists.map(l => this.request(`/api/lists/${l.id}`)));
+    const lists = await Promise.all(campaign.lists.map(l => this.getList(l.id)));
     if (lists.some(l => l.status === 'archived')) throw new Error('An audience list is archived.');
     const html = await this.request(`/api/campaigns/${id}/preview`, { text: true });
     const fingerprint = createHash('sha256').update(JSON.stringify({ campaign, template, lists, html })).digest('hex');

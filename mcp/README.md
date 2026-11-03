@@ -1,9 +1,10 @@
 # Finch listmonk MCP bridge
 
 An API companion in the listmonk fork, using the official MCP TypeScript SDK.
-ChatGPT generates the newsletter content; no separate OpenAI API key is needed
-for this bridge. It supports stdio for a trusted local operator and authenticated
-Streamable HTTP for a remote ChatGPT connection.
+ChatGPT generates the newsletter content. The bridge supports stdio for a
+trusted operator, a private OpenAI tunnel, and OAuth-protected Streamable HTTP.
+The private tunnel uses a restricted OpenAI runtime key for transport, with no
+model-use permissions; the bridge itself does not call an OpenAI model API.
 
 ## Run locally
 
@@ -24,7 +25,51 @@ For an MCP desktop client, use command `node`, arguments
 chat or checked-in client configuration. Stdio is a local trust boundary: the
 process owner has both management and send scope, subject to ENABLE_SEND.
 
-## Remote ChatGPT
+## Private ChatGPT tunnel (Finch deployment)
+
+The approved Finch connection uses OpenAI's Secure MCP Tunnel. The outbound
+client and stdio bridge run in one unprivileged container, without public ports.
+The public HTTP MCP service remains disabled. The tunnel must be linked to the
+intended ChatGPT workspace and its private plugin kept creator-only.
+
+After specific access approval, create a dedicated listmonk API user with
+`campaigns:get`, `campaigns:manage`, `templates:get`, and per-list `list:get`
+for the allowed lists. Do not grant subscriber, settings, user administration,
+blanket campaign/list access, or send permissions to a drafting-only identity.
+Save its environment as root-readable `/etc/finch-newsletter/mcp.env`:
+
+```dotenv
+LISTMONK_API_USER=finch-chatgpt
+LISTMONK_API_TOKEN=REPLACE_PRIVATELY
+LISTMONK_ALLOWED_LIST_IDS=3,4
+ENABLE_SEND=false
+```
+
+Save `CONTROL_PLANE_API_KEY` and `CONTROL_PLANE_TUNNEL_ID` separately in
+`/etc/finch-newsletter/tunnel.env`. The runtime key needs only Tunnels Read/Use,
+with a bounded lifetime and a private renewal procedure. Finch's initial key
+expires December 3, 2026. It has no model-use or admin-key permissions.
+
+```sh
+cd deploy/finch
+docker compose -f compose.yml -f compose.tunnel.yml --profile tunnel up -d --build tunnel
+docker compose -f compose.yml -f compose.tunnel.yml --profile tunnel ps
+```
+
+The pinned amd64 image verifies the official OpenAI tunnel-client v0.0.19
+download checksum. Readiness alone does not establish tool discovery: verify
+`/health/mcp` from inside the container and perform a draft/preview operation
+from the installed ChatGPT plugin. In ChatGPT Plugins, add a custom MCP server,
+choose Tunnel and the correct tunnel ID, and no additional authentication for
+this approved private operator boundary. Review the discovered tools before use.
+
+Stdio does not provide per-ChatGPT-user OAuth identity: reviews belong to the
+local operator process. Do not share this private plugin across operators or
+enable sending without adding identity-bound authorization and verifying the
+client's human confirmation flow. Never enable both tunnel and public HTTP
+deployment profiles together. See the [official tunnel guide](https://developers.openai.com/api/docs/guides/secure-mcp-tunnels).
+
+## Public HTTP ChatGPT connection (alternative)
 
 Set `MCP_TRANSPORT=http`, `MCP_RESOURCE_URL=https://newsletter.finchnow.com/mcp`,
 `OAUTH_ISSUER`, and `OAUTH_JWKS_URL`. Configure the OAuth provider to issue signed

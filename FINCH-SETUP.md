@@ -1,168 +1,143 @@
-# Finch newsletter setup
+# Finch newsletter deployment
 
-Prepared for newsletter.finchnow.com, Google Cloud hosting, Amazon SES delivery,
-approximately 5,000 Mailchimp contacts, and newsletter creation through ChatGPT.
+Live application: https://newsletter.finchnow.com
+Fork: https://github.com/plainwalker-dev/listmonk
+Draft PR: https://github.com/plainwalker-dev/listmonk/pull/1
+Integration branch: feature/chatgpt-mcp, based on upstream listmonk v6.2.0.
 
 ## Current state
 
-- Fork: https://github.com/plainwalker-dev/listmonk
-- Local integration branch: feature/chatgpt-mcp, based on stable v6.2.0,
-  upstream commit ef0a75872463f10a4848af6c547d1c057405453a.
-- The MCP bridge and deployment configuration are prepared. No newsletter has
-  been sent and no customer contacts have been imported.
-- Google Cloud project created: `finch-newsletter` (Finch Newsletter), under
-  the finchnow.com organization. No VM has been provisioned yet.
-- SES verification, production access, OAuth,
-  migration, and live end-to-end checks remain outstanding.
+The application, PostgreSQL, HTTPS, private backups and a restored migration are
+running. The supplied export contains 515 contacts; the user subsequently
+identified the archives as mock data. Do not treat these records as a production
+mailing audience or evidence for an SES production-access application.
+No email has been sent. SES verification/production access and live delivery
+checks remain outstanding. Sending through MCP is disabled both in its
+configuration and by the listmonk API role.
 
-## Hosting
+## Hosting and recovery
 
-Start with one Google Compute Engine VM (e2-small, 2 GB RAM plus 2 GB swap) in
-`finch-newsletter`, running Debian, Docker Compose, listmonk, PostgreSQL,
-Caddy, and the MCP bridge. Confirm the project's existing region, billing,
-network and access conventions before provisioning. This initial topology has
-one VM as a failure domain; choose Cloud SQL and a separate application host
-if Finch requires managed database availability.
+- Google Cloud project: finch-newsletter, number 547088214499.
+- VM: finch-newsletter, zone us-east1-c; e2-small, 2 GB RAM and 2 GB swap.
+- Debian 13; 30 GB balanced boot disk; deletion protection and Shielded VM.
+- Static public IP: 34.138.183.90. Cloudflare newsletter A record is DNS-only.
+- Estimated base cost including public IPv4: about $19/month. Backups, traffic
+  and SES are additional. A $25/month alert exists; it does not cap spending.
+- SSH uses OS Login through IAP. TCP 22 is limited to 35.235.240.0/20.
+- Caddy alone publishes TCP 80/443. Database and MCP have no public host ports.
+- Source checkout: /opt/finch-newsletter; deployment: deploy/finch.
+- Root-only initial administrator/database secrets: deploy/finch/.env.
+  Administrator username is finch-admin. Retrieve the password privately through
+  the approved Google Cloud administrator session; never paste it into chat.
+  Google-based login to listmonk itself has not been configured.
+- App root URL and title are set. Public signup and campaign archives are
+  disabled until the sending setup and production audience are ready.
 
-Reserve a static public IP. Keep PostgreSQL and MCP off public host ports;
-only Caddy publishes ports 80 and 443. Use the organization's existing VM
-administration policy, preferably OS Login through IAP rather than public SSH.
-Do not create or broaden IAM grants until the exact project is known.
+Daily logical backups run at 04:15 UTC plus up to 15 minutes jitter, through
+finch-newsletter-backup.timer. Database dumps and uploads are kept in
+/var/backups/finch-newsletter. A systemd drop-in invokes upload-backup.py to copy
+completed pairs to private bucket finch-newsletter-backups-547088214499.
+The bucket uses uniform access and enforced public-access prevention.
+The attached newsletter-backup service account has only Storage Object Creator
+on that bucket. It cannot read/delete previous backups and has no saved key.
+The uploader uses generation-zero preconditions and verifies size and checksum.
+No automatic object pruning is configured. Disk snapshots run daily with
+14-day retention, keeping existing snapshots if the disk is deleted.
 
-1. Point a new Cloudflare A record `newsletter` to the reserved IP. Start in
-   DNS-only mode so Caddy can obtain its public TLS certificate. Do not change
-   the root domain's existing web or mail records.
-2. Copy this checkout onto the host. In `deploy/finch`, copy `.env.example`
-   to `.env` and populate strong, unique secrets using the approved secret store.
-   The initial admin variables prevent an unauthenticated first-user takeover.
-3. Run `docker compose up -d` from `deploy/finch`. The listmonk app automatically
-   installs an empty database. Set the root URL to
-   `https://newsletter.finchnow.com` and media upload path to `/listmonk/uploads`.
-4. Create a dedicated listmonk API user/role with campaign get/manage/send,
-   template get and list get permissions only for the newsletter lists.
-   Do not use a Super Admin API token for the bridge.
-5. Use `backup.sh` for database dumps and uploads, ship backups to a private
-   Google Cloud Storage bucket with retention, and test a restore on an isolated
-   database before importing contacts. Add persistent-disk snapshot schedules
-   as an additional recovery layer. These are deployment tasks, not yet configured.
+A post-import dump was restored into an isolated temporary database and compared
+with the live table totals: 517 subscribers, 4 lists, 1 campaign, 4 templates.
+The same dump was downloaded from GCS and its SHA-256 matched the restored dump:
+65a65724d6521a88a5acd85994158b232c0d7e064e35a348328c85d0a6993bb5.
+The temporary restore database was dropped after verification.
 
-`upload-backup.py` uploads a completed database/uploads pair with generation-zero
-preconditions and verifies each returned checksum. It uses the VM metadata
-identity, restricted to Storage Object Creator on the dedicated private backup
-bucket. It cannot read or delete existing backup objects. Configure BACKUP_BUCKET
-in a systemd drop-in and run the uploader as ExecStartPost of the backup service.
-Never grant project-wide Storage Admin or save a service-account key on the VM.
-
-The Compose application uses the released listmonk image because the integration
-does not modify its Go code. The MCP container is built from this fork's `mcp/`.
-The VM persists container volumes across reboots; deleting a VM or disk requires
-separate recovery planning. Do not run `docker compose down -v` on production.
-
-## Amazon SES and Cloudflare
-
-Selected region: `us-east-2` (Ohio), matching the region assigned to the signed-in
-AWS project in the new AWS experience. Use that region for the SES identity,
-SMTP credentials and SNS topic. The domain identity has been created with
-2048-bit Easy DKIM. All three DNS-only CNAMEs are published in Cloudflare;
-AWS verification is pending.
-
-1. Create an SES domain identity for `finchnow.com`, with Easy DKIM. Copy the
-   exact verification/DKIM records returned by AWS to Cloudflare. DKIM CNAMEs
-   must remain DNS-only. DNS tokens cannot be invented ahead of identity creation.
-2. Proposed sender: `Finch <newsletter@finchnow.com>`; confirm this address and
-   choose an existing monitored Reply-To mailbox. Verifying a domain does not
-   create a receiving mailbox. Preserve existing root MX and SPF records.
-3. Optionally configure custom MAIL FROM `bounce.newsletter.finchnow.com`. Add
-   the AWS-provided MX and SPF TXT record there, without replacing the root
-   domain's existing SPF. Review existing DMARC alignment and policy.
-4. Request SES production access for consent-based newsletters and sufficient
-   daily/rate quotas for at least 5,000 recipients plus tests. Sandbox status is
-   region-specific and is insufficient for this audience.
-5. Create a dedicated least-privilege SES SMTP credential and configure
-   listmonk SMTP with `email-smtp.us-east-2.amazonaws.com`, port 587, STARTTLS,
-   and the generated SMTP username/password. Start with rate limits below the
-   actual approved account limits. Do not use an AWS console password or an AWS
-   secret access key as the SMTP password.
-6. Create a standard SNS topic for bounces and complaints. Configure listmonk's
-   SES bounce webhook at
-   `https://newsletter.finchnow.com/webhooks/service/ses`, then subscribe it
-   with raw message delivery disabled. Configure an SNS topic allowlist if
-   available in the selected listmonk version. Set one hard bounce or complaint
-   to blocklist, and verify behavior with the SES mailbox simulator. Include
-   original headers so campaign/subscriber attribution works.
+For rebuilds, review bootstrap.sh, populate private secrets, start Compose, and
+restore a chosen database/uploads pair using an authorized recovery operator.
+The backup writer identity cannot perform recovery reads. Keep secret/config
+recovery separate from source control. Never run docker compose down -v on
+production. One VM is the deployment's availability boundary.
 
 ## Mailchimp migration
 
-A supplied Mailchimp audience export contains 515 unique addresses: 489 subscribed,
-9 unsubscribed, and 17 cleaned. Private CSVs have been prepared and validated,
-preserving names, original fields and VENUES tags. They have not been imported.
-A full account export has been requested; retrieve the existing completed
-download rather than requesting another export within Mailchimp's 24-hour limit.
-Keep exports private and outside Git.
+The migration imported and checked every source identity, name, full JSON
+attributes and subscription state against both exports:
 
-1. Inventory all audiences, fields, groups, tags, subscribed contacts,
-   unsubscribed contacts, non-subscribed contacts, cleaned contacts, and archived
-   records where available. Record counts and normalized email duplicates per
-   audience. Freeze sends and capture a final delta immediately before cutover.
-2. Map each Mailchimp audience to a listmonk list, preserving list-level
-   subscription state. Store merge fields, tags, source audience IDs, and
-   available opt-in timestamps as JSON attributes with stable keys. Mailchimp
-   tags are contact attributes; listmonk list tags and campaign tags are not
-   equivalent subscriber tags. Recreate useful segments using those attributes.
-3. Import only contacts with subscribed status into the corresponding
-   confirmed memberships. Preserve unsubscribes per audience; never infer
-   consent from the mere presence of an email address. A person can be
-   unsubscribed in one audience and subscribed in another.
-4. Keep cleaned addresses and complaints suppressed; do not subscribe
-   non-subscribed or archived contacts. Global blocklisting is stronger than
-   per-list unsubscription, so explicitly reconcile cross-audience conflicts
-   before import. Do not use a blanket overwrite that revives suppressed users.
-5. Convert active templates: Mailchimp merge tags, unsubscribe links, browser
-   links and image hosting need listmonk equivalents. Ensure listmonk unsubscribe
-   URLs and the correct Finch sender/address footer are present in rendered mail.
-6. Preserve historic newsletters/reports as a private archive. They cannot be
-   assumed to become native listmonk engagement history. Importing old content
-   must not create a campaign that can be accidentally sent.
-7. Reconcile row totals, unique addresses, membership totals and suppression
-   totals; spot-check names, tags, personalization, unsubscribe behavior and
-   image links. Test delivery on Finch-owned inboxes. Keep Mailchimp available
-   until final unsubscribe/bounce deltas and signup forms/integrations are moved.
+- 515 distinct mock contacts migrated.
+- 489 confirmed memberships in private list 3, Finch Newsletter.
+- 9 unsubscribed memberships, including one spam complaint.
+- 18 globally blocklisted contacts: 17 cleaned/hard-bounce records plus that
+  complaint. The complaint overlaps the nine unsubscribed records.
+- Private list 4, Finch Delivery Tests, is empty.
+- Two bundled sample contacts and their lists/campaign remain untouched;
+  the application's global count is therefore 517, not 515.
 
-## ChatGPT integration
+Original fields, tags, source IDs, available subscription timestamps and exported
+bounce/complaint history are preserved as subscriber attributes. No blanket
+overwrite or resubscribe operation was used. Root-only import receipt:
+/var/lib/finch-newsletter-migration.json.
 
-See [mcp/README.md](mcp/README.md) for installation and the tool contract.
-The proposed remote endpoint is `https://newsletter.finchnow.com/mcp`.
-Configure a standards-compliant OAuth provider before making that endpoint live.
-The bridge validates JWT access-token signature, issuer, audience, expiry and
-scopes. Credentials for listmonk and SES remain on the server.
+The full Mailchimp export includes four campaign HTML files, images and reports.
+It is preserved privately on the operator's computer, outside Git. At the user's
+request neither source ZIP was uploaded to cloud storage. Historical reports
+are not native listmonk engagement history. Mailchimp billing was untouched.
 
-The workflow is: brief -> create draft -> preview -> prepare send -> user
-confirmation -> send. Send reviews expire in 10 minutes, belong to one OAuth
-user and campaign, and are consumed once. Content, template or list metadata
-changes invalidate them. Human confirmation is enforced by the MCP client,
-not proven by a review token; keep explicit confirmation enabled for
-`send_newsletter` and verify the actual ChatGPT prompt before enabling sends.
+Before real cutover, obtain the intended production audience, reconcile its
+consent/unsubscribe/bounce state, import a final delta and move signup forms and
+integrations. Do not send to this mock migration audience.
 
-## Acceptance before switching over
+## Amazon SES
 
-- Project, billing and deployment owner selected; HTTPS and backup restore work.
-- SES domain verified, production access granted, rate limits set, bounce and
-  complaint processing tested, and DNS authentication checked.
-- All migration totals reconciled, suppression states checked, signup forms
-  switched and final Mailchimp deltas imported.
-- OAuth login restricts access to Finch's approved operators; drafts and
-  previews work from ChatGPT; confirmation, expiration, replay and changed-draft
-  behavior are verified against a private test list.
-- Enable live sends only after the above checks and a Finch-owned inbox test.
+Region: us-east-2 (Ohio), matching the account's new AWS experience project.
+Identity finchnow.com uses 2048-bit Easy DKIM. All three AWS-provided DNS-only
+CNAMEs are published in Cloudflare and publicly resolve. Existing Google
+Workspace MX/SPF/DKIM and DMARC records were preserved. AWS now reports the identity Verified and DKIM Successful.
 
-## Primary references
+Outstanding delivery steps:
 
-- https://listmonk.app/docs/installation/
-- https://listmonk.app/docs/apis/campaigns/
-- https://listmonk.app/docs/bounces/
-- https://mailchimp.com/help/export-back-up-data/
-- https://docs.aws.amazon.com/ses/latest/dg/smtp-credentials.html
+1. Request region-specific production access with accurate
+   information about the real newsletter audience and consent process.
+2. Confirm the sender newsletter@finchnow.com and a monitored Reply-To mailbox.
+   Domain verification does not create an inbox. Confirm the required business
+   postal address/footer before a live newsletter.
+3. Create a dedicated scoped SMTP credential; use
+   email-smtp.us-east-2.amazonaws.com:587 with STARTTLS and the approved rate.
+4. Configure standard SNS bounce/complaint notifications in the same region to
+   https://newsletter.finchnow.com/webhooks/service/ses, raw delivery disabled;
+   restrict accepted topics and blocklist on hard bounces/complaints.
+5. Test authentication, unsubscribe behavior, simulator events and delivery to
+   Finch-owned inboxes before enabling live sends. Each test send needs approval.
+
+## ChatGPT connection
+
+The user approved a private OpenAI tunnel linking the Personal Platform
+organization to the Finch ChatGPT workspace. This avoids publishing the MCP
+endpoint or adding an OAuth service. The tunnel uses an outbound connection and
+an unprivileged container. See mcp/README.md and compose.tunnel.yml.
+
+The dedicated finch-chatgpt API user has campaigns:get, campaigns:manage and
+templates:get, plus list:get only on lists 3 and 4. Permission probes verified
+contacts, settings, users and unrelated lists are denied. No campaigns:send or
+subscriber permissions are granted. The server stores private environment files
+in /etc/finch-newsletter, root-readable only. No secret is committed.
+The runtime key has only Tunnels Read/Use and expires December 3, 2026; renew it
+privately before that date to retain the connection. Do not grant model-use,
+admin-key or tunnel-management permissions to the runtime key.
+
+Keep the ChatGPT plugin private to its creator. The stdio tunnel is a trusted
+operator boundary, not per-user OAuth: its review owner is process-local. Do
+not share it with other operators without adding identity-bound authorization.
+The public HTTP MCP profile remains disabled; it still requires JWT OAuth if
+used instead of the tunnel. Do not enable both deployment profiles together.
+
+The workflow is brief -> draft -> preview -> send review -> explicit approval.
+Sending remains disabled pending delivery and client-confirmation validation.
+A ten-minute, single-use review token checks content/template/list changes;
+it is not proof of human approval. The ChatGPT client must ask for approval.
+Listmonk has no atomic compare-and-send API and same-count audience changes
+cannot be detected reliably; avoid direct edits between review and send.
+
+## References
+
+- https://listmonk.app/docs/
 - https://docs.aws.amazon.com/ses/latest/dg/request-production-access.html
-- https://docs.cloud.google.com/compute/docs/containers
-- https://developers.openai.com/api/docs/guides/custom-mcp-server
-- https://developers.openai.com/plugins/build/auth
+- https://developers.openai.com/api/docs/guides/secure-mcp-tunnels
+- https://github.com/openai/tunnel-client/blob/master/docs/onboarding.md

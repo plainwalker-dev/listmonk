@@ -1,0 +1,16 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "FinchNewsletterSendingOnly",
+      "Effect": "Allow",
+      "Action": "ses:SendRawEmail",
+      "Resource": "arn:aws:ses:us-east-2:668857951317:identity/finchnow.com",
+      "Condition": {
+        "StringEquals": {
+          "ses:FromAddress": "newsletter@finchnow.com"
+        }
+      }
+    }
+  ]
+}

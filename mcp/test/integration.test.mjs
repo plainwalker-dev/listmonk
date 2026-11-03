@@ -72,6 +72,18 @@ test('blocks disallowed audiences and editing campaigns that are not drafts', as
   assert.equal(state.calls.some(c => c.method === 'PUT'), false);
 });
 
+test('audience discovery corrects the v6.2 doubled total without accessing contacts', async t => {
+  const { mcp, state } = await connect(t);
+  state.list.subscriber_count = 996;
+  state.list.subscriber_statuses = { confirmed: 489, unsubscribed: 9 };
+  const audiences = data(await call(mcp, 'list_newsletter_audiences'));
+  assert.equal(audiences[0].subscriber_count, 498);
+  assert.equal(audiences[0].subscriber_statuses.confirmed, 489);
+  const review = data(await call(mcp, 'prepare_newsletter_send', { campaign_id: 7 }));
+  assert.equal(review.audiences[0].subscriber_count, 498);
+  assert.equal(state.calls.some(c => c.path.startsWith('/api/subscribers')), false);
+});
+
 test('review permits only one send and replays cannot send again', async t => {
   const { mcp, state } = await connect(t);
   const review = data(await call(mcp, 'prepare_newsletter_send', { campaign_id: 7 }));
