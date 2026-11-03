@@ -63,6 +63,15 @@ from the installed ChatGPT plugin. In ChatGPT Plugins, add a custom MCP server,
 choose Tunnel and the correct tunnel ID, and no additional authentication for
 this approved private operator boundary. Review the discovered tools before use.
 
+For a separate sending identity, set `LISTMONK_SEND_API_USER`,
+`LISTMONK_SEND_API_TOKEN`, and `LISTMONK_SEND_ALLOWED_LIST_IDS` together. The
+sender needs `campaigns:send` and per-list `list:get` only for its sending lists;
+the drafting account can remain unable to send. Both allowlists are checked
+before delivery. Partial sender configuration fails startup. The default
+single-identity setup remains supported for operators who explicitly grant it.
+The tunnel profile's `FINCH_ENABLE_SEND` switch defaults to false and overrides
+the bridge environment. Change it only after access and sending approval.
+
 Stdio does not provide per-ChatGPT-user OAuth identity: reviews belong to the
 local operator process. Do not share this private plugin across operators or
 enable sending without adding identity-bound authorization and verifying the

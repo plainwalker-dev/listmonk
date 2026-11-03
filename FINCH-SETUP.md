@@ -11,7 +11,7 @@ The application, PostgreSQL, HTTPS, private backups and a restored migration are
 running. The supplied export contains 515 contacts; the user subsequently
 identified the archives as mock data. Do not treat these records as a production
 mailing audience or evidence for an SES production-access application.
-No email has been sent. SES verification/production access and live delivery
+No email has been sent. SES production access and live delivery
 checks remain outstanding. Sending through MCP is disabled both in its
 configuration and by the listmonk API role.
 
@@ -49,6 +49,11 @@ with the live table totals: 517 subscribers, 4 lists, 1 campaign, 4 templates.
 The same dump was downloaded from GCS and its SHA-256 matched the restored dump:
 65a65724d6521a88a5acd85994158b232c0d7e064e35a348328c85d0a6993bb5.
 The temporary restore database was dropped after verification.
+
+A fresh backup after the ChatGPT draft, Finch template and SES configuration was
+also restored successfully: listmonk-20261103T070000Z.dump, SHA-256
+3067141ad9af4b6d49c275481a358bf1386e9dc086eb09e6df5f3977dc35d948.
+Its totals were 517 subscribers, 4 lists, 2 campaigns and 5 templates.
 
 For rebuilds, review bootstrap.sh, populate private secrets, start Compose, and
 restore a chosen database/uploads pair using an authorized recovery operator.
@@ -95,16 +100,27 @@ Outstanding delivery steps:
 
 1. Request region-specific production access with accurate
    information about the real newsletter audience and consent process.
-2. Confirm the sender newsletter@finchnow.com and a monitored Reply-To mailbox.
-   Domain verification does not create an inbox. Confirm the required business
-   postal address/footer before a live newsletter.
-3. Create a dedicated scoped SMTP credential; use
-   email-smtp.us-east-2.amazonaws.com:587 with STARTTLS and the approved rate.
-4. Configure standard SNS bounce/complaint notifications in the same region to
-   https://newsletter.finchnow.com/webhooks/service/ses, raw delivery disabled;
-   restrict accepted topics and blocklist on hard bounces/complaints.
-5. Test authentication, unsubscribe behavior, simulator events and delivery to
-   Finch-owned inboxes before enabling live sends. Each test send needs approval.
+2. Sender is newsletter@finchnow.com; Reply-To is mediasales@finchnow.com.
+   The user confirmed manual imports will include only explicit opt-ins.
+   Template 5, Finch Newsletter, is the default and includes the complete
+   postal footer: 141 E Houston St, Floor 5, New York, NY 10002, USA.
+3. The dedicated finch-newsletter-smtp IAM user has no console login and only
+   the checked-in ses-sending-policy.json: SendRawEmail for the Ohio identity,
+   with From restricted to newsletter@finchnow.com. STARTTLS authentication at
+   email-smtp.us-east-2.amazonaws.com:587 passed. Credentials are root-only at
+   /etc/finch-newsletter/ses-smtp.json and in listmonk's private settings.
+   SES delivery is disabled; listmonk's required enabled SMTP block currently
+   points to a closed local port, so it cannot deliver mail accidentally.
+4. SNS topic finch-newsletter-feedback uses ses-feedback-policy.json, allowing
+   only the verified Finch SES identity to publish. The HTTPS subscription to
+   /webhooks/service/ses is confirmed, with raw delivery disabled. Original
+   headers are excluded; blocklisting works by address without campaign UUID
+   attribution. Caddy routes through ses-webhook, which checks TopicArn and
+   confirmation URLs before listmonk performs SNS signature verification.
+   Hard bounce/complaint threshold is one; soft-bounce threshold is three.
+5. Authentication and rendered unsubscribe URLs passed. Live inbox and simulator
+   event checks await user approval. Do not infer successful delivery from an
+   SMTP login or a confirmed subscription. Never resend blindly after a timeout.
 
 ## ChatGPT connection
 
@@ -121,6 +137,20 @@ in /etc/finch-newsletter, root-readable only. No secret is committed.
 The runtime key has only Tunnels Read/Use and expires December 3, 2026; renew it
 privately before that date to retain the connection. Do not grant model-use,
 admin-key or tunnel-management permissions to the runtime key.
+
+Private app: https://chatgpt.com/plugins/plugin_asdk_app_6ae97b10124881918945919021cc142a
+It is installed for its creator in development mode and has not been published
+to the Finch workspace. A live create/update/preview check passed on draft 2,
+using only empty private test list 4. The bridge corrects the v6.2 single-list
+API's doubled total from its subscription-status breakdown; it never reads
+contacts to calculate the membership count.
+
+Code supports a distinct sender identity and list allowlist. A proposed
+temporary test sender would have campaigns:send plus list:get only on list 4,
+leaving the original drafting identity unable to send. It has not been created:
+the three-message inbox/simulator test and its access await explicit approval.
+FINCH_ENABLE_SEND defaults to false. Stop and disable the temporary sender
+after a test, and do not grant access to the mock production-named list.
 
 Keep the ChatGPT plugin private to its creator. The stdio tunnel is a trusted
 operator boundary, not per-user OAuth: its review owner is process-local. Do
