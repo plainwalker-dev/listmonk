@@ -15,6 +15,24 @@ test "$deploy_dir" = /opt/finch-newsletter/deploy/finch || {
 export DEBIAN_FRONTEND=noninteractive
 apt-get update
 apt-get install -y docker.io docker-compose openssl ca-certificates unattended-upgrades
+# Give the 2 GB host room for occasional installation/restart memory spikes.
+# The swap file is on the encrypted boot disk and is readable only by root.
+if test ! -e /swapfile; then
+  fallocate -l 2G /swapfile
+  chmod 600 /swapfile
+  mkswap /swapfile >/dev/null
+fi
+if ! swapon --show=NAME --noheadings | grep -Fxq /swapfile; then
+  swapon /swapfile
+fi
+if ! grep -Eq '^/swapfile[[:space:]]' /etc/fstab; then
+  printf '%s\n' '/swapfile none swap sw 0 0' >> /etc/fstab
+fi
+install -d -m 755 /etc/docker
+if test ! -e /etc/docker/daemon.json; then
+  printf '%s\n' '{"log-driver":"local","log-opts":{"max-size":"10m","max-file":"3"}}' > /etc/docker/daemon.json
+  systemctl restart docker
+fi
 systemctl enable --now docker
 cd "$deploy_dir"
 if test ! -e .env; then

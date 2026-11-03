@@ -17,7 +17,7 @@ approximately 5,000 Mailchimp contacts, and newsletter creation through ChatGPT.
 
 ## Hosting
 
-Start with one Google Compute Engine VM (proposed e2-medium, 4 GB RAM) in
+Start with one Google Compute Engine VM (e2-small, 2 GB RAM plus 2 GB swap) in
 `finch-newsletter`, running Debian, Docker Compose, listmonk, PostgreSQL,
 Caddy, and the MCP bridge. Confirm the project's existing region, billing,
 network and access conventions before provisioning. This initial topology has
