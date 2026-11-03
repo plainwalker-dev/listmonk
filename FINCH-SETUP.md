@@ -10,13 +10,15 @@ approximately 5,000 Mailchimp contacts, and newsletter creation through ChatGPT.
   upstream commit ef0a75872463f10a4848af6c547d1c057405453a.
 - The MCP bridge and deployment configuration are prepared. No newsletter has
   been sent and no customer contacts have been imported.
-- Cloud project selection, DNS, SES verification, production access, OAuth,
+- Google Cloud project created: `finch-newsletter` (Finch Newsletter), under
+  the finchnow.com organization. No VM has been provisioned yet.
+- DNS, SES verification, production access, OAuth,
   migration, and live end-to-end checks remain outstanding.
 
 ## Hosting
 
-Start with one Google Compute Engine VM (proposed e2-medium, 4 GB RAM) in the
-chosen existing project, running Debian, Docker Compose, listmonk, PostgreSQL,
+Start with one Google Compute Engine VM (proposed e2-medium, 4 GB RAM) in
+`finch-newsletter`, running Debian, Docker Compose, listmonk, PostgreSQL,
 Caddy, and the MCP bridge. Confirm the project's existing region, billing,
 network and access conventions before provisioning. This initial topology has
 one VM as a failure domain; choose Cloud SQL and a separate application host
