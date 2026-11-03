@@ -4,7 +4,7 @@ import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/
 import { createRemoteJWKSet, jwtVerify } from 'jose';
 import { createServer } from './server.mjs';
 
-export function createHttpApp({ client, reviews, enableSend, issuer, jwksUrl, resourceUrl, host = '127.0.0.1', keySet }) {
+export function createHttpApp({ client, sendClient, reviews, enableSend, issuer, jwksUrl, resourceUrl, host = '127.0.0.1', keySet }) {
   for (const value of [issuer, jwksUrl, resourceUrl]) {
     if (!value || new URL(value).protocol !== 'https:') throw new Error('HTTP transport requires HTTPS OAuth issuer, JWKS URL and resource URL.');
   }
@@ -44,7 +44,7 @@ export function createHttpApp({ client, reviews, enableSend, issuer, jwksUrl, re
     }
   });
   app.post('/mcp', async (req, res) => {
-    const server = createServer({ client, reviews, enableSend, ...req.newsletterAuth });
+    const server = createServer({ client, sendClient, reviews, enableSend, ...req.newsletterAuth });
     const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true });
     res.on('close', () => { void transport.close(); void server.close(); });
     try {

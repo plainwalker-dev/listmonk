@@ -17,7 +17,7 @@ services:
     environment:
       LISTMONK_URL: http://app:9000
       MCP_TRANSPORT: stdio
-      ENABLE_SEND: 'false'
+      ENABLE_SEND: ${FINCH_ENABLE_SEND:-false}
       HEALTH_LISTEN_ADDR: 127.0.0.1:8080
       LOG_LEVEL: warn
       LOG_FORMAT: json

@@ -93,6 +93,24 @@ test('review permits only one send and replays cannot send again', async t => {
   assert.equal(state.calls.filter(c => c.path.endsWith('/status')).length, 1);
 });
 
+test('a separate sender token sends only to its own allowed lists', async t => {
+  for (const permitted of [true, false]) {
+    const sendRequests = [];
+    const sendClient = new ListmonkClient({ url: 'http://127.0.0.1:9000', user: 'sender', token: 'sender-test-token',
+      allowedListIds: permitted ? [1] : [99], fetchImpl: async (url, options) => {
+        assert.equal(options.headers.Authorization, 'Basic ' + Buffer.from('sender:sender-test-token').toString('base64'));
+        sendRequests.push(url.pathname);
+        return Response.json({ data: { id: 7, status: 'running' } });
+      } });
+    const { mcp, state } = await connect(t, { sendClient });
+    const review = data(await call(mcp, 'prepare_newsletter_send', { campaign_id: 7 }));
+    const response = await call(mcp, 'send_newsletter', { campaign_id: 7, review_token: review.review_token });
+    assert.equal(Boolean(response.isError), !permitted);
+    assert.equal(sendRequests.length, permitted ? 1 : 0);
+    assert.equal(state.calls.some(c => c.path.endsWith('/status')), false);
+  }
+});
+
 test('editing refuses attachments and other settings it cannot preserve', async t => {
   const { mcp, state } = await connect(t);
   state.campaign.media = [{ id: 12 }];
