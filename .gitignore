@@ -18,3 +18,11 @@ node_modules
 listmonk
 dist/*
 uploads/
+.env
+.env.*
+!.env.example
+*.tfstate
+*.tfstate.*
+*.tfvars
+.terraform/
+integration-data/

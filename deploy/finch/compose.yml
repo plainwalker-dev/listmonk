@@ -1,0 +1,64 @@
+# Run from this directory with an explicitly populated .env file.
+# MCP is an opt-in profile; it requires ../../mcp/.env and an OAuth provider.
+services:
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: listmonk
+      POSTGRES_USER: listmonk
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set a strong database password}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: [CMD-SHELL, pg_isready -U listmonk -d listmonk]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+  app:
+    image: listmonk/listmonk:v6.2.0
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    command: [sh, -c, "./listmonk --install --idempotent --yes --config '' && ./listmonk --upgrade --yes --config '' && ./listmonk --config ''"]
+    environment:
+      LISTMONK_app__address: 0.0.0.0:9000
+      LISTMONK_db__host: db
+      LISTMONK_db__port: 5432
+      LISTMONK_db__user: listmonk
+      LISTMONK_db__database: listmonk
+      LISTMONK_db__password: ${POSTGRES_PASSWORD:?Set a strong database password}
+      LISTMONK_db__ssl_mode: disable
+      LISTMONK_ADMIN_USER: ${LISTMONK_ADMIN_USER:?Set an initial administrator username}
+      LISTMONK_ADMIN_PASSWORD: ${LISTMONK_ADMIN_PASSWORD:?Set an initial administrator password}
+      TZ: America/New_York
+    volumes:
+      - uploads:/listmonk/uploads
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on: [app]
+    ports: ["80:80", "443:443"]
+    environment:
+      NEWSLETTER_DOMAIN: ${NEWSLETTER_DOMAIN:-newsletter.finchnow.com}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+  mcp:
+    profiles: [mcp]
+    build: ../../mcp
+    restart: unless-stopped
+    depends_on: [app]
+    env_file: ${MCP_ENV_FILE:-../../mcp/.env}
+    environment:
+      LISTMONK_URL: http://app:9000
+      MCP_TRANSPORT: http
+      MCP_HOST: 0.0.0.0
+      MCP_RESOURCE_URL: https://${NEWSLETTER_DOMAIN:-newsletter.finchnow.com}/mcp
+volumes:
+  postgres-data:
+  uploads:
+  caddy-data:
+  caddy-config:

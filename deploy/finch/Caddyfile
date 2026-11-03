@@ -1,0 +1,10 @@
+{$NEWSLETTER_DOMAIN:newsletter.finchnow.com} {
+    encode gzip
+    @mcp path /mcp /mcp/* /.well-known/oauth-protected-resource /.well-known/oauth-protected-resource/*
+    handle @mcp {
+        reverse_proxy mcp:3100
+    }
+    handle {
+        reverse_proxy app:9000
+    }
+}
