@@ -53,9 +53,10 @@ separate recovery planning. Do not run `docker compose down -v` on production.
 
 ## Amazon SES and Cloudflare
 
-Recommended starting region: `us-east-1` (Northern Virginia). Use the same region
-for the SES identity, SMTP credentials and SNS topic. There is no existing Finch
-SES region established in this setup yet.
+Selected region: `us-east-2` (Ohio), matching the region assigned to the signed-in
+AWS project in the new AWS experience. Use that region for the SES identity,
+SMTP credentials and SNS topic. The domain identity has been created with
+2048-bit Easy DKIM; DNS publication and verification remain outstanding.
 
 1. Create an SES domain identity for `finchnow.com`, with Easy DKIM. Copy the
    exact verification/DKIM records returned by AWS to Cloudflare. DKIM CNAMEs
@@ -70,7 +71,7 @@ SES region established in this setup yet.
    daily/rate quotas for at least 5,000 recipients plus tests. Sandbox status is
    region-specific and is insufficient for this audience.
 5. Create a dedicated least-privilege SES SMTP credential and configure
-   listmonk SMTP with `email-smtp.us-east-1.amazonaws.com`, port 587, STARTTLS,
+   listmonk SMTP with `email-smtp.us-east-2.amazonaws.com`, port 587, STARTTLS,
    and the generated SMTP username/password. Start with rate limits below the
    actual approved account limits. Do not use an AWS console password or an AWS
    secret access key as the SMTP password.
