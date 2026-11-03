@@ -12,7 +12,7 @@ approximately 5,000 Mailchimp contacts, and newsletter creation through ChatGPT.
   been sent and no customer contacts have been imported.
 - Google Cloud project created: `finch-newsletter` (Finch Newsletter), under
   the finchnow.com organization. No VM has been provisioned yet.
-- DNS, SES verification, production access, OAuth,
+- SES verification, production access, OAuth,
   migration, and live end-to-end checks remain outstanding.
 
 ## Hosting
@@ -56,7 +56,8 @@ separate recovery planning. Do not run `docker compose down -v` on production.
 Selected region: `us-east-2` (Ohio), matching the region assigned to the signed-in
 AWS project in the new AWS experience. Use that region for the SES identity,
 SMTP credentials and SNS topic. The domain identity has been created with
-2048-bit Easy DKIM; DNS publication and verification remain outstanding.
+2048-bit Easy DKIM. All three DNS-only CNAMEs are published in Cloudflare;
+AWS verification is pending.
 
 1. Create an SES domain identity for `finchnow.com`, with Easy DKIM. Copy the
    exact verification/DKIM records returned by AWS to Cloudflare. DKIM CNAMEs
@@ -85,10 +86,12 @@ SMTP credentials and SNS topic. The domain identity has been created with
 
 ## Mailchimp migration
 
-Request a full Mailchimp account export containing audiences, templates,
-campaign content, reports and images. Keep the export private and outside Git
-(the ignored `integration-data/` directory is available). No Mailchimp access
-or export is available in this workspace yet.
+A supplied Mailchimp audience export contains 515 unique addresses: 489 subscribed,
+9 unsubscribed, and 17 cleaned. Private CSVs have been prepared and validated,
+preserving names, original fields and VENUES tags. They have not been imported.
+A full account export has been requested; retrieve the existing completed
+download rather than requesting another export within Mailchimp's 24-hour limit.
+Keep exports private and outside Git.
 
 1. Inventory all audiences, fields, groups, tags, subscribed contacts,
    unsubscribed contacts, non-subscribed contacts, cleaned contacts, and archived
