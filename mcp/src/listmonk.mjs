@@ -32,11 +32,17 @@ export class ListmonkClient {
     return campaign;
   }
   async listLists() {
-    // Fetch individually so the bridge never returns unrelated list metadata.
+    // Resolve only allowed IDs and never return unrelated list metadata.
     return Promise.all([...this.allowed].map(id => this.getList(id)));
   }
   async getList(id) {
-    const list = await this.request(`/api/lists/${id}`);
+    this.checkLists([id]);
+    // The paginated endpoint refreshes membership stats when slow-query
+    // caching is off. v6.2's individual-list endpoint skips that refresh.
+    // Listmonk applies the API user's list permissions to this query.
+    const page = await this.request('/api/lists?per_page=all');
+    const list = page.results.find(item => item.id === id);
+    if (!list) throw new Error('The allowed audience could not be read.');
     // v6.2 GetList adds status totals to an already aggregated SQL total.
     // The status breakdown avoids that double count without reading contacts.
     if (list.subscriber_statuses && typeof list.subscriber_statuses === 'object' && !Array.isArray(list.subscriber_statuses)) {

@@ -47,7 +47,10 @@ export function createServer({ client, sendClient = client, reviews, owner = 'lo
     return {
       campaign_id, subject: snapshot.campaign.subject, from_email: snapshot.campaign.from_email,
       audiences: snapshot.lists.map(l => ({ id: l.id, name: l.name, subscriber_count: l.subscriber_count })),
-      recipient_estimate: snapshot.campaign.to_send,
+      // v6.2 populates to_send only after delivery starts. A draft's zero is
+      // not an eligible-recipient count; membership totals also include blocks.
+      recipient_estimate: null,
+      recipient_estimate_note: 'Eligible recipients are calculated by listmonk when sending starts. Audience membership counts may be cached and include suppressed contacts; overlapping lists are deduplicated.',
       html: snapshot.html,
       ...reviews.prepare(owner, campaign_id, snapshot.fingerprint),
       approval_required: 'Explicit human confirmation through the MCP client. A token does not prove consent.',

@@ -115,7 +115,7 @@ MCP service. Do not configure automatic approval for the send tool.
 | create_newsletter_draft | Save a regular email draft |
 | update_newsletter_draft | Replace supported fields in a draft only |
 | preview_newsletter | Render with listmonk's sample subscriber |
-| prepare_newsletter_send | Show review, audience estimate and a 10-minute token |
+| prepare_newsletter_send | Show review, audience memberships and a 10-minute token |
 | send_newsletter | Start delivery after explicit human approval in the client |
 
 The send action is annotated as destructive. The review token is bound to
@@ -135,7 +135,9 @@ rechecks the snapshot immediately before sending but cannot lock out a
 simultaneous direct admin/API edit or detect a same-count audience membership
 swap. Avoid editing templates, audiences or the draft between review and send.
 Recipients are resolved by listmonk when sending, with its current suppression
-and subscription states. Estimates are not an immutable recipient manifest.
+and subscription states. Drafts return a null recipient estimate because listmonk
+v6.2 calculates it only after sending starts. Audience membership counts include
+suppressed contacts and may be cached; they are not an immutable recipient manifest.
 
 If a send request times out, check the campaign in listmonk before taking any
 further action. The token is already consumed and the campaign may be running;

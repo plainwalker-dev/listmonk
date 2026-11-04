@@ -29,6 +29,7 @@ function fixture() {
       else if (path === '/api/campaigns/7') value = state.campaign;
       else if (path === '/api/templates') value = [state.template];
       else if (path === '/api/lists/1') value = state.list;
+      else if (path === '/api/lists') value = { results: [state.list] };
       else if (path === '/api/campaigns/7/preview') return new Response('<html>Sample newsletter</html>');
       else throw new Error(`Unexpected API route: ${path}`);
       return Response.json({ data: value });
@@ -87,10 +88,21 @@ test('audience discovery corrects the v6.2 doubled total without accessing conta
 test('review permits only one send and replays cannot send again', async t => {
   const { mcp, state } = await connect(t);
   const review = data(await call(mcp, 'prepare_newsletter_send', { campaign_id: 7 }));
-  assert.equal(review.recipient_estimate, 5000);
+  assert.equal(review.recipient_estimate, null);
   const results = await Promise.all([0, 1].map(() => call(mcp, 'send_newsletter', { campaign_id: 7, review_token: review.review_token })));
   assert.equal(results.filter(r => !r.isError).length, 1);
   assert.equal(state.calls.filter(c => c.path.endsWith('/status')).length, 1);
+});
+
+test('a draft zero is not presented as a zero-recipient estimate', async t => {
+  const { mcp, state } = await connect(t);
+  state.campaign.to_send = 0;
+  const review = data(await call(mcp, 'prepare_newsletter_send', { campaign_id: 7 }));
+  assert.equal(review.recipient_estimate, null);
+  assert.match(review.recipient_estimate_note, /when sending starts/);
+  assert.equal(review.audiences[0].subscriber_count, 5000);
+  assert.equal(state.calls.some(c => c.path.startsWith('/api/subscribers')), false);
+  assert.equal(state.calls.some(c => c.path === '/api/lists'), true);
 });
 
 test('a separate sender token sends only to its own allowed lists', async t => {
