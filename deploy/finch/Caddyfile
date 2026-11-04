@@ -1,0 +1,14 @@
+{$NEWSLETTER_DOMAIN:newsletter.finchnow.com} {
+    encode gzip
+    @ses path /webhooks/service/ses /webhooks/service/ses/*
+    handle @ses {
+        reverse_proxy ses-webhook:3200
+    }
+    @mcp path /mcp /mcp/* /.well-known/oauth-protected-resource /.well-known/oauth-protected-resource/*
+    handle @mcp {
+        reverse_proxy mcp:3100
+    }
+    handle {
+        reverse_proxy app:9000
+    }
+}

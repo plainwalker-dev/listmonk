@@ -1,0 +1,18 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "VerifiedFinchIdentityMayPublishFeedback",
+      "Effect": "Allow",
+      "Principal": { "Service": "ses.amazonaws.com" },
+      "Action": "sns:Publish",
+      "Resource": "arn:aws:sns:us-east-2:668857951317:finch-newsletter-feedback",
+      "Condition": {
+        "StringEquals": { "AWS:SourceAccount": "668857951317" },
+        "ArnEquals": {
+          "AWS:SourceArn": "arn:aws:ses:us-east-2:668857951317:identity/finchnow.com"
+        }
+      }
+    }
+  ]
+}

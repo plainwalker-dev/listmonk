@@ -1,0 +1,17 @@
+services:
+  ses-webhook:
+    profiles: [ses]
+    build: ./ses-webhook
+    restart: unless-stopped
+    environment:
+      SES_SNS_TOPIC_ARN: arn:aws:sns:us-east-2:668857951317:finch-newsletter-feedback
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    mem_limit: 128m
+    pids_limit: 64
+    healthcheck:
+      test: [CMD, node, -e, "fetch('http://127.0.0.1:3200/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
