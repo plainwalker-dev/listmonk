@@ -15,8 +15,10 @@ The user-approved three-message MCP test finished on November 4, 2026. Both
 AWS simulator events passed; the Finch inbox received a transient soft bounce,
 so inbox delivery is not verified. The mock audience received nothing.
 The temporary sender, SES delivery and MCP sending were disabled afterward.
-SES production-access submission is approved but remains outstanding because
-Chrome controls fail; the prepared form has been handed to the user.
+The user confirmed submitting the approved SES production-access request on
+November 4. AWS acknowledgement, decision and production quotas have not been
+independently verified because Chrome controls fail and no acknowledgement was
+found in the connected Gmail account. Await AWS's decision before production.
 
 ## Hosting and recovery
 
