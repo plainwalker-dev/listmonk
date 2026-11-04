@@ -11,9 +11,12 @@ The application, PostgreSQL, HTTPS, private backups and a restored migration are
 running. The supplied export contains 515 contacts; the user subsequently
 identified the archives as mock data. Do not treat these records as a production
 mailing audience or evidence for an SES production-access application.
-No email has been sent. SES production access and live delivery
-checks remain outstanding. Sending through MCP is disabled both in its
-configuration and by the listmonk API role.
+The user-approved three-message MCP test finished on November 4, 2026. Both
+AWS simulator events passed; the Finch inbox received a transient soft bounce,
+so inbox delivery is not verified. The mock audience received nothing.
+The temporary sender, SES delivery and MCP sending were disabled afterward.
+SES production-access submission is approved but remains outstanding because
+Chrome controls fail; the prepared form has been handed to the user.
 
 ## Hosting and recovery
 
@@ -55,6 +58,12 @@ also restored successfully: listmonk-20261103T070000Z.dump, SHA-256
 3067141ad9af4b6d49c275481a358bf1386e9dc086eb09e6df5f3977dc35d948.
 Its totals were 517 subscribers, 4 lists, 2 campaigns and 5 templates.
 
+The post-test backup listmonk-20261104T172316Z.dump was uploaded with verified
+checksums and restored into an isolated temporary database. SHA-256:
+c2119f3cd53b54475d2d4c471cb199dae4cb20de4c34597c9db30870fd702745.
+Restored totals: 520 subscribers, 4 lists, 2 campaigns, 5 templates.
+The temporary restore database was dropped after verification.
+
 For rebuilds, review bootstrap.sh, populate private secrets, start Compose, and
 restore a chosen database/uploads pair using an authorized recovery operator.
 The backup writer identity cannot perform recovery reads. Keep secret/config
@@ -71,9 +80,10 @@ attributes and subscription state against both exports:
 - 9 unsubscribed memberships, including one spam complaint.
 - 18 globally blocklisted contacts: 17 cleaned/hard-bounce records plus that
   complaint. The complaint overlaps the nine unsubscribed records.
-- Private list 4, Finch Delivery Tests, is empty.
+- Private list 4, Finch Delivery Tests, contains the three approved test
+  addresses. The bounce and complaint simulator identities are blocklisted.
 - Two bundled sample contacts and their lists/campaign remain untouched;
-  the application's global count is therefore 517, not 515.
+  the global count was 517 before testing, and is now 520 with test contacts.
 
 Original fields, tags, source IDs, available subscription timestamps and exported
 bounce/complaint history are preserved as subscriber attributes. No blanket
@@ -118,9 +128,15 @@ Outstanding delivery steps:
    attribution. Caddy routes through ses-webhook, which checks TopicArn and
    confirmation URLs before listmonk performs SNS signature verification.
    Hard bounce/complaint threshold is one; soft-bounce threshold is three.
-5. Authentication and rendered unsubscribe URLs passed. Live inbox and simulator
-   event checks await user approval. Do not infer successful delivery from an
-   SMTP login or a confirmed subscription. Never resend blindly after a timeout.
+5. The user approved and the private MCP connector sent campaign 2, subject
+   Finch newsletter connection check, to exactly mediasales@finchnow.com,
+   bounce@simulator.amazonses.com and complaint@simulator.amazonses.com.
+   It finished with 3/3 sent. Both simulator notifications reached the protected
+   webhook and caused automatic blocklisting. The Finch inbox received an SES
+   Transient/General soft bounce without a diagnostic code; it remains enabled
+   under the three-soft-bounce threshold. Inbox delivery is unverified. No
+   additional test is authorized by the completed three-message approval.
+   Resolve the mailbox's ability to receive external mail before real sending.
 
 ## ChatGPT connection
 
@@ -141,16 +157,19 @@ admin-key or tunnel-management permissions to the runtime key.
 Private app: https://chatgpt.com/plugins/plugin_asdk_app_6ae97b10124881918945919021cc142a
 It is installed for its creator in development mode and has not been published
 to the Finch workspace. A live create/update/preview check passed on draft 2,
-using only empty private test list 4. The bridge corrects the v6.2 single-list
-API's doubled total from its subscription-status breakdown; it never reads
-contacts to calculate the membership count.
+followed by the user-approved send through the connected Finch Newsletter MCP
+tools. The connector queries permission-filtered audience totals and never
+reads contacts. It corrects the v6.2 doubled single-list total and refreshes
+membership stats through the paginated list endpoint. Draft recipient estimates
+are null: v6.2 populates to_send only when sending begins. Membership totals
+include suppressed contacts and may be cached; they are not delivery counts.
 
-Code supports a distinct sender identity and list allowlist. A proposed
-temporary test sender would have campaigns:send plus list:get only on list 4,
-leaving the original drafting identity unable to send. It has not been created:
-the three-message inbox/simulator test and its access await explicit approval.
-FINCH_ENABLE_SEND defaults to false. Stop and disable the temporary sender
-after a test, and do not grant access to the mock production-named list.
+The distinct test sender finch-chatgpt-test-send (ID 3) was created with
+campaigns:send plus list:get only on list 4, leaving the original drafting
+identity unable to send. After the completed three-message test, its status
+was set disabled, SES SMTP was disabled, and FINCH_ENABLE_SEND=false was
+verified on the healthy private tunnel. Its credentials remain root-private
+and inactive. Do not grant access to the mock production-named list.
 
 Keep the ChatGPT plugin private to its creator. The stdio tunnel is a trusted
 operator boundary, not per-user OAuth: its review owner is process-local. Do
@@ -159,7 +178,11 @@ The public HTTP MCP profile remains disabled; it still requires JWT OAuth if
 used instead of the tunnel. Do not enable both deployment profiles together.
 
 The workflow is brief -> draft -> preview -> send review -> explicit approval.
-Sending remains disabled pending delivery and client-confirmation validation.
+Sending remains disabled. A real newsletter needs actual consented contacts,
+working inbox delivery, SES production access and explicit approval of a fresh
+review. The live connector send used the user's exact prior three-message
+approval. It does not establish that every ChatGPT client will display a
+separate confirmation dialog; human approval remains a client responsibility.
 A ten-minute, single-use review token checks content/template/list changes;
 it is not proof of human approval. The ChatGPT client must ask for approval.
 Listmonk has no atomic compare-and-send API and same-count audience changes
